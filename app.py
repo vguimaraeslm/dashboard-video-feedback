@@ -7,7 +7,7 @@ import ast
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(page_title="Monitor de Qualidade de Vídeo", layout="wide", page_icon="🎬")
 
-# --- ESTILO CSS PERSONALIZADO (Para dar um ar mais "Pro") ---
+# --- ESTILO CSS ---
 st.markdown("""
 <style>
     .metric-card {
@@ -32,8 +32,8 @@ except Exception as e:
     st.error(f"Erro de conexão com o Supabase: {e}")
     st.stop()
 
-# --- CARREGAMENTO DE DADOS (ATUALIZADO PARA 60 SEGUNDOS) ---
-@st.cache_data(ttl=60)  # <--- MUDANÇA AQUI: Cache de 1 minuto
+# --- CARREGAMENTO DE DADOS (Cache de 1 min) ---
+@st.cache_data(ttl=60)
 def get_data():
     response = supabase.table("video_feedbacks").select("*").execute()
     df = pd.DataFrame(response.data)
@@ -45,10 +45,9 @@ def get_data():
         # Limpeza robusta de tópicos
         def limpar_topico(x):
             try:
-                # Se for lista ou string parecida com lista
                 val = ast.literal_eval(x) if isinstance(x, str) and x.startswith('[') else x
                 if isinstance(val, list) and len(val) > 0:
-                    return val[0] # Pega o primeiro tópico
+                    return val[0]
                 return str(val)
             except:
                 return str(x)
@@ -58,7 +57,7 @@ def get_data():
             
     return df
 
-# Carrega dados
+# Carrega dados do banco
 with st.spinner('Atualizando dados...'):
     df = get_data()
 
@@ -66,20 +65,27 @@ if df.empty:
     st.info("Aguardando dados... Nenhuma solicitação encontrada no banco.")
     st.stop()
 
-# --- BARRA LATERAL (FILTROS INTELIGENTES) ---
+# --- BARRA LATERAL (FILTROS) ---
 st.sidebar.title("Filtros")
 
-# Filtro de Data (Últimos X dias é mais útil que mês fixo)
+# Filtro de Data
 dias = st.sidebar.slider("Período de Análise (Dias)", 1, 90, 30)
 data_corte = pd.Timestamp.now(tz=df['created_at'].dt.tz) - pd.Timedelta(days=dias)
 df_filtrado = df[df['created_at'] >= data_corte].copy()
 
 # Filtro de Marca
-todas_marcas = sorted(df_filtrado['video_marca'].dropna().unique())
+todas_marcas = sorted(df_filtrado['video_marca'].dropna().unique()) if not df_filtrado.empty else []
 marca_sel = st.sidebar.multiselect("Filtrar Marcas", todas_marcas, default=todas_marcas)
 
-if marca_sel:
+if marca_sel and not df_filtrado.empty:
     df_filtrado = df_filtrado[df_filtrado['video_marca'].isin(marca_sel)]
+
+# --- VERIFICAÇÃO DE DADOS VAZIOS APÓS FILTRO ---
+# Se o filtro (ex: 1 dia) não trouxe nada, para aqui para não quebrar os gráficos
+if df_filtrado.empty:
+    st.title("🎬 Monitor de Ajustes de Vídeo")
+    st.warning(f"Nenhum dado encontrado nos últimos {dias} dias para os filtros selecionados.")
+    st.stop()
 
 # --- DASHBOARD PRINCIPAL ---
 
@@ -87,7 +93,7 @@ st.title("🎬 Monitor de Ajustes de Vídeo")
 st.markdown(f"Analisando solicitações dos últimos **{dias} dias**.")
 st.divider()
 
-# 1. KPIs DE TOPO
+# 1. KPIs
 col1, col2, col3, col4 = st.columns(4)
 total_solicitacoes = len(df_filtrado)
 total_videos = df_filtrado['file_name'].nunique()
@@ -101,56 +107,60 @@ col4.metric("Taxa de Resolução", f"{(resolvidos/total_solicitacoes*100):.0f}%"
 
 st.divider()
 
-# 2. A VISÃO ESTRATÉGICA (HEATMAP)
-# Cruzamento: Qual marca pede qual tipo de ajuste?
+# 2. HEATMAP
 st.subheader("🔥 Mapa de Calor: Onde estão os problemas?")
-st.markdown("Este gráfico mostra a concentração de pedidos. Quanto mais escuro, mais frequente é aquele tipo de ajuste para aquela marca.")
+st.markdown("Concentração de pedidos por Marca x Tipo de Ajuste.")
 
-if not df_filtrado.empty and 'ai_category_topic' in df_filtrado.columns:
-    # Cria uma tabela cruzada
+if 'ai_category_topic' in df_filtrado.columns:
     heatmap_data = df_filtrado.groupby(['video_marca', 'ai_category_topic']).size().reset_index(name='Quantidade')
     
-    fig_heatmap = px.density_heatmap(
-        heatmap_data, 
-        x="video_marca", 
-        y="ai_category_topic", 
-        z="Quantidade", 
-        color_continuous_scale="Reds",
-        labels={"video_marca": "Marca", "ai_category_topic": "Tipo de Ajuste", "Quantidade": "Pedidos"}
-    )
-    fig_heatmap.update_layout(xaxis_title=None, yaxis_title=None)
-    st.plotly_chart(fig_heatmap, use_container_width=True)
+    if not heatmap_data.empty:
+        fig_heatmap = px.density_heatmap(
+            heatmap_data, 
+            x="video_marca", 
+            y="ai_category_topic", 
+            z="Quantidade", 
+            color_continuous_scale="Reds",
+            labels={"video_marca": "Marca", "ai_category_topic": "Tipo de Ajuste", "Quantidade": "Pedidos"}
+        )
+        fig_heatmap.update_layout(xaxis_title=None, yaxis_title=None)
+        # ADICIONADA A KEY ÚNICA AQUI
+        st.plotly_chart(fig_heatmap, use_container_width=True, key="grafico_calor")
+    else:
+        st.info("Dados insuficientes para gerar o mapa de calor neste período.")
 
-# 3. DETALHAMENTO (PARETO)
+# 3. PARETO E BARRAS
 col_g1, col_g2 = st.columns(2)
 
 with col_g1:
     st.subheader("Principais Motivos de Ajuste")
-    # Gráfico de barras horizontais ordenado (Pareto)
     top_motivos = df_filtrado['ai_category_topic'].value_counts().head(10).sort_values(ascending=True)
-    fig_motivos = px.bar(
-        top_motivos, 
-        orientation='h', 
-        text_auto=True,
-        color_discrete_sequence=['#FF4B4B'] # Cor padrão do Streamlit
-    )
-    fig_motivos.update_layout(xaxis_title="Quantidade", yaxis_title=None, showlegend=False)
-    st.plotly_chart(fig_motivos, use_container_width=True)
+    if not top_motivos.empty:
+        fig_motivos = px.bar(
+            top_motivos, 
+            orientation='h', 
+            text_auto=True,
+            color_discrete_sequence=['#FF4B4B']
+        )
+        fig_motivos.update_layout(xaxis_title="Quantidade", yaxis_title=None, showlegend=False)
+        # ADICIONADA A KEY ÚNICA AQUI
+        st.plotly_chart(fig_motivos, use_container_width=True, key="grafico_motivos")
 
 with col_g2:
     st.subheader("Volume por Marca")
-    # Gráfico de barras simples para volume
     top_marcas = df_filtrado['video_marca'].value_counts().head(10).sort_values(ascending=True)
-    fig_marcas = px.bar(
-        top_marcas, 
-        orientation='h', 
-        text_auto=True,
-        color_discrete_sequence=['#1F77B4']
-    )
-    fig_marcas.update_layout(xaxis_title="Quantidade", yaxis_title=None, showlegend=False)
-    st.plotly_chart(fig_marcas, use_container_width=True)
+    if not top_marcas.empty:
+        fig_marcas = px.bar(
+            top_marcas, 
+            orientation='h', 
+            text_auto=True,
+            color_discrete_sequence=['#1F77B4']
+        )
+        fig_marcas.update_layout(xaxis_title="Quantidade", yaxis_title=None, showlegend=False)
+        # ADICIONADA A KEY ÚNICA AQUI
+        st.plotly_chart(fig_marcas, use_container_width=True, key="grafico_marcas")
 
-# 4. TABELA OPERACIONAL
+# 4. TABELA
 st.divider()
 with st.expander("📋 Ver Lista de Solicitações (Dados Brutos)"):
     cols_show = ['created_at', 'video_marca', 'video_versao', 'ai_category_topic', 'ai_summary', 'status']
