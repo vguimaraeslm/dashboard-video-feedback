@@ -115,34 +115,20 @@ with tab1:
     
     st.markdown("###")
     
-    c1, c2 = st.columns(2)
+    # Gráfico Único de Barras Verticais
+    st.subheader("O que mais pedem?")
+    contagem = df_filtrado['ai_category_topic'].value_counts().reset_index()
+    contagem.columns = ['Ajuste', 'Qtd']
     
-    with c1:
-        st.subheader("O que mais pedem?")
-        contagem = df_filtrado['ai_category_topic'].value_counts().reset_index()
-        contagem.columns = ['Ajuste', 'Qtd']
-        
-        # MUDANÇA: Eixo X agora é Ajuste (Vertical) e bargap alto
-        fig_bar = px.bar(
-            contagem.head(10), 
-            x='Ajuste', y='Qtd', 
-            text_auto=True,
-            color_discrete_sequence=['#4F46E5']
-        )
-        # bargap=0.7 deixa as barras bem finas
-        fig_bar.update_layout(bargap=0.7, xaxis_title=None)
-        st.plotly_chart(fig_bar, use_container_width=True, key="bar_top")
-
-    with c2:
-        st.subheader("Status")
-        if 'status' in df_filtrado.columns:
-            fig_pie = px.pie(
-                df_filtrado, 
-                names='status', 
-                hole=0.6,
-                color_discrete_sequence=px.colors.qualitative.Pastel
-            )
-            st.plotly_chart(fig_pie, use_container_width=True, key="pie_status")
+    fig_bar = px.bar(
+        contagem.head(15), # Mostra até 15 tópicos
+        x='Ajuste', y='Qtd', 
+        text_auto=True,
+        color_discrete_sequence=['#4F46E5']
+    )
+    # bargap=0.7 mantém as barras finas mesmo com o gráfico largo
+    fig_bar.update_layout(bargap=0.7, xaxis_title=None)
+    st.plotly_chart(fig_bar, use_container_width=True, key="bar_top_full")
 
 # --- ABA 2: COMPARAÇÃO ---
 with tab2:
@@ -151,7 +137,6 @@ with tab2:
     qtd_marca = df_filtrado['video_marca'].value_counts().reset_index()
     qtd_marca.columns = ['Marca', 'Total']
     
-    # MUDANÇA: Vertical e fina
     fig_comp = px.bar(
         qtd_marca, 
         x='Marca', y='Total',
@@ -171,7 +156,6 @@ with tab2:
         text_auto=True,
         color_discrete_sequence=px.colors.qualitative.Safe
     )
-    # bargap aqui também
     fig_stack.update_layout(bargap=0.6, xaxis_title=None) 
     st.plotly_chart(fig_stack, use_container_width=True, key="bar_stack")
 
