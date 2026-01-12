@@ -5,36 +5,36 @@ import plotly.graph_objects as go
 from supabase import create_client, Client
 import ast
 
-# --- 1. CONFIGURAÇÃO INICIAL E FONTE (Preceito: Tipografia Legível) ---
+# --- 1. CONFIGURAÇÃO INICIAL E FONTE ---
 st.set_page_config(page_title="Analytics de Qualidade", layout="wide", page_icon="✨")
 
-# --- 2. CSS AVANÇADO (Preceito: Consistência Visual e Grid System) ---
+# --- 2. CSS AVANÇADO (Design System) ---
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
     /* Reset Geral */
     html, body, [class*="css"] {
         font-family: 'Inter', sans-serif;
-        background-color: #F8FAFC; /* Slate 50 - Fundo mais frio e profissional */
-        color: #1E293B; /* Slate 800 - Contraste alto para leitura */
+        background-color: #F8FAFC; /* Slate 50 */
+        color: #1E293B; /* Slate 800 */
     }
 
-    /* Remove padding excessivo do topo do Streamlit */
+    /* Remove padding excessivo do topo */
     .block-container {
-        padding-top: 1.5rem;
+        padding-top: 2rem;
         padding-bottom: 2rem;
     }
 
-    /* ESTILO DOS CARDS (KPIs) - Garante altura igual */
+    /* ESTILO DOS CARDS (KPIs) */
     .kpi-card {
         background-color: white;
         border-radius: 12px;
         padding: 24px;
         box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
         border: 1px solid #E2E8F0;
-        text-align: left; /* Alinhamento à esquerda é mais fácil de ler */
-        height: 140px; /* Altura fixa para evitar desproporção */
+        text-align: left;
+        height: 140px; /* Altura fixa para alinhamento perfeito */
         display: flex;
         flex-direction: column;
         justify-content: center;
@@ -42,13 +42,13 @@ st.markdown("""
     }
     
     .kpi-card:hover {
-        border-color: #6366F1; /* Indigo no hover */
+        border-color: #6366F1;
         transform: translateY(-2px);
     }
 
     .kpi-label {
         font-size: 0.875rem;
-        color: #64748B; /* Slate 500 */
+        color: #64748B;
         font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.05em;
@@ -58,13 +58,13 @@ st.markdown("""
     .kpi-value {
         font-size: 2.25rem;
         font-weight: 700;
-        color: #0F172A; /* Slate 900 */
+        color: #0F172A;
         line-height: 1;
     }
 
     .kpi-sub {
         font-size: 0.875rem;
-        color: #10B981; /* Verde esmeralda para sucesso */
+        color: #10B981;
         margin-top: 8px;
         font-weight: 500;
     }
@@ -73,13 +73,13 @@ st.markdown("""
     .chart-container {
         background-color: white;
         border-radius: 12px;
-        padding: 20px;
+        padding: 24px;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
         border: 1px solid #E2E8F0;
-        margin-bottom: 20px;
+        margin-bottom: 24px;
     }
     
-    /* Remove decorações padrão do Streamlit */
+    /* Remove decorações padrão */
     header {visibility: hidden;}
     .stDeployButton {display:none;}
     
@@ -108,7 +108,6 @@ def get_data():
             if 'created_at' in df.columns:
                 df['created_at'] = pd.to_datetime(df['created_at'])
             
-            # Tratamento robusto de lista/string
             def limpar_topico(x):
                 try:
                     val = ast.literal_eval(x) if isinstance(x, str) and x.startswith('[') else x
@@ -124,7 +123,7 @@ def get_data():
 
 df = get_data()
 
-# --- 4. SIDEBAR (FILTROS) ---
+# --- 4. SIDEBAR ---
 st.sidebar.markdown("### ⚙️ Configurações")
 if not df.empty:
     dias = st.sidebar.slider("Janela de Tempo (Dias)", 1, 90, 30)
@@ -155,8 +154,7 @@ resolvidos = len(df_filtrado[df_filtrado['status'] == 'Resolvido']) if 'status' 
 taxa_res = (resolvidos/total*100) if total else 0
 pendentes = total - resolvidos
 
-# --- BLOCO DE KPIs PERSONALIZADOS (HTML/CSS PURO) ---
-# Usamos st.columns para o grid, mas o conteúdo é HTML controlado
+# --- BLOCO DE KPIs (HTML PURO) ---
 c1, c2, c3, c4 = st.columns(4)
 
 with c1:
@@ -195,11 +193,10 @@ with c4:
     </div>
     """, unsafe_allow_html=True)
 
-st.markdown("###") # Espaçamento
+st.markdown("###")
 
-# --- GRÁFICOS (PRINCÍPIO DE TUFTE: MINIMALISMO) ---
+# --- GRÁFICOS ---
 
-# Layout: 2/3 para Heatmap (Principal), 1/3 para Barras (Secundário)
 col_main, col_sec = st.columns([2, 1]) 
 
 with col_main:
@@ -209,10 +206,10 @@ with col_main:
     if 'ai_category_topic' in df_filtrado.columns:
         heat_data = df_filtrado.groupby(['video_marca', 'ai_category_topic']).size().reset_index(name='Qtd')
         
-        # Gráfico limpo: sem grid, sem background
+        # AQUI ESTAVA O ERRO: Mudamos de "Plum" para "Purples"
         fig_heat = px.density_heatmap(
             heat_data, x="video_marca", y="ai_category_topic", z="Qtd",
-            color_continuous_scale="Plum", # Paleta suave roxa
+            color_continuous_scale="Purples", # <--- CORRIGIDO AQUI
         )
         fig_heat.update_layout(
             paper_bgcolor='rgba(0,0,0,0)',
@@ -242,7 +239,7 @@ with col_sec:
     fig_bar.update_layout(
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
-        xaxis=dict(showgrid=False, showticklabels=False), # Remove ruído
+        xaxis=dict(showgrid=False, showticklabels=False),
         yaxis=dict(showgrid=False),
         margin=dict(l=0, r=0, t=30, b=0),
         height=350,
@@ -251,14 +248,14 @@ with col_sec:
     st.plotly_chart(fig_bar, use_container_width=True, key="bar_clean")
     st.markdown('</div>', unsafe_allow_html=True)
 
-# --- TABELA DE DADOS (MINIMALISTA) ---
+# --- TABELA DE DADOS ---
 st.markdown('<div class="chart-container">', unsafe_allow_html=True)
 st.markdown("#### 📋 Detalhamento Recente")
 
 cols_view = ['created_at', 'video_marca', 'ai_category_topic', 'status', 'ai_summary']
 if not df_filtrado.empty:
     df_display = df_filtrado[cols_view].sort_values('created_at', ascending=False).head(50)
-    # Formatação condicional simples
+    
     st.dataframe(
         df_display, 
         use_container_width=True, 
