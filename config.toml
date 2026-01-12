@@ -1,0 +1,6 @@
+[theme]
+primaryColor = "#4F46E5"    # Um roxo/azul moderno (Indigo)
+backgroundColor = "#F3F4F6" # Fundo cinza bem clarinho (não cansa a vista)
+secondaryBackgroundColor = "#FFFFFF" # Barra lateral branca
+textColor = "#1F2937"       # Texto cinza escuro (mais elegante que preto puro)
+font = "sans serif"
